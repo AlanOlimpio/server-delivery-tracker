@@ -3,6 +3,39 @@ import { Socket, Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 
+interface JoinDeliveryData {
+  deliveryId: string;
+}
+
+interface LocationData {
+  deliveryId: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface CustomSocket extends Socket {
+  deliveryId?: string;
+}
+
+type DeliveryStatus =
+  | "pending"
+  | "preparing"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled";
+
+interface Delivery {
+  deliveryId: string;
+  status: DeliveryStatus;
+  createdAt: Date;
+  driverLocation?: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+const deliveries = new Map<string, Delivery>();
+
 dotenv.config();
 
 const app: Express = express();
@@ -13,6 +46,74 @@ app.use(express.json());
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Welcome to Delivery Tracker!");
+});
+
+app.post("/deliveries", (req: Request, res: Response) => {
+  const deliveryId = Math.random().toString(36).substring(2, 8);
+
+  const delivery: Delivery = {
+    deliveryId,
+    status: "pending",
+    createdAt: new Date(),
+  };
+
+  deliveries.set(deliveryId, delivery);
+
+  console.log("Delivery created:", delivery);
+
+  res.status(201).json({
+    deliveryId,
+  });
+});
+
+app.get("/deliveries/:deliveryId", (req: Request, res: Response) => {
+  const { deliveryId } = req.params;
+  console.log("Fetching delivery:", deliveryId);
+
+  const delivery = deliveries.get(deliveryId);
+
+  if (!delivery) {
+    return res.status(404).json({
+      message: "Entrega não encontrada",
+    });
+  }
+
+  return res.status(200).json(delivery);
+});
+
+app.patch("/deliveries/:deliveryId/status", (req: Request, res: Response) => {
+  const { deliveryId } = req.params;
+  const { status } = req.body;
+
+  const delivery = deliveries.get(deliveryId);
+
+  if (!delivery) {
+    return res.status(404).json({
+      message: "Entrega não encontrada",
+    });
+  }
+
+  const validStatuses: DeliveryStatus[] = [
+    "pending",
+    "preparing",
+    "out_for_delivery",
+    "delivered",
+    "cancelled",
+  ];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({
+      message: "Status inválido",
+    });
+  }
+
+  delivery.status = status;
+
+  deliveries.set(deliveryId, delivery);
+
+  console.log("Delivery status updated:", delivery);
+
+  return res.status(200).json(delivery);
 });
 
 const server = app.listen(port, () => {
