@@ -111,7 +111,14 @@ app.patch("/deliveries/:deliveryId/status", (req: Request, res: Response) => {
 
   deliveries.set(deliveryId, delivery);
 
-  console.log("Delivery status updated:", delivery);
+  const roomId = `delivery-${deliveryId}`;
+
+  console.log(`Status update for ${roomId}: ${delivery.status}`);
+
+  io.to(roomId).emit("deliveryStatusUpdated", {
+    deliveryId,
+    status: delivery.status,
+  });
 
   return res.status(200).json(delivery);
 });
